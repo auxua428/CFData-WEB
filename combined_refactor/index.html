@@ -2123,6 +2123,9 @@
                     <div class="modal-field full" id="resultIPv6BracketsField">
                         <label class="inline-check"><input type="checkbox" id="resultIPv6Brackets" checked onchange="updateResultPreview()"> IPv6 地址添加方括号</label>
                     </div>
+                    <div class="modal-field full" id="resultOutboundIPField">
+                        <label class="inline-check"><input type="checkbox" id="resultOutboundIP" onchange="updateResultPreview()"> IP 替换为出站 IP（使用结果中的出站IP字段）</label>
+                    </div>
                     <div class="modal-field full">
                         <label>输出顺序</label>
                         <div class="order-list" id="resultOrderList"></div>
@@ -5629,7 +5632,7 @@
         }
 
         function scanResultToObject(r) {
-            return { ip: r.IP || '', port: String(r.Port ?? ''), ipport: `${r.IP || ''}:${r.Port ?? ''}`, dc: r.DataCenter || '', dcCountry: r.DCCountry || '', region: r.Region || '', city: r.City || '', latency: r.LatencyStr || '' };
+            return { ip: r.IP || '', port: String(r.Port ?? ''), ipport: `${r.IP || ''}:${r.Port ?? ''}`, outboundIP: r.OutboundIP || r.outboundIP || '', dc: r.DataCenter || '', dcCountry: r.DCCountry || '', region: r.Region || '', city: r.City || '', latency: r.LatencyStr || '' };
         }
 
         function testResultToObject(r) {
@@ -5721,11 +5724,11 @@
             const rows = getCurrentExportRows(resultModalMode);
             const start = Math.max(1, parseInt(document.getElementById('resultStartRow')?.value || '1', 10) || 1);
             const end = Math.max(start, parseInt(document.getElementById('resultEndRow')?.value || '20', 10) || 20);
-            return rows.slice(start - 1, end).map((row) => {
+            return applyOutboundIPToRows(rows.slice(start - 1, end).map((row) => {
                 const next = { ...row };
                 for (const field of resultCustomFields) next[field.key] = field.value;
                 return next;
-            });
+            }), useOutboundIPFor('result'));
         }
 
         function formatCSVCell(value) {
@@ -5747,6 +5750,20 @@
         function useIPv6BracketsFor(prefix) {
             const el = document.getElementById(`${prefix}IPv6Brackets`);
             return el ? el.checked : true;
+        }
+
+        function useOutboundIPFor(prefix) {
+            const el = document.getElementById(`${prefix}OutboundIP`);
+            return el ? el.checked : false;
+        }
+
+        function applyOutboundIPToRows(rows, useOutbound) {
+            if (!useOutbound) return rows;
+            return rows.map((row) => {
+                const oip = String(row.outboundIP || row.OutboundIP || '').trim();
+                if (!oip || oip === '-') return row;
+                return { ...row, ip: oip, ipport: `${oip}:${row.port ?? ''}` };
+            });
         }
 
         function buildResultPreview(format) {
